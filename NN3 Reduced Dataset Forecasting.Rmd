@@ -1,0 +1,223 @@
+---
+title: "Forecasting the NN3 Reduced Dataset Time Series"
+output:
+  pdf_document: default
+fontsize: 10pt
+spacing: 1
+geometry: left=2cm,right=2cm,top=1cm,bottom=1.5cm
+highlight: tango
+---
+\vspace{-5truemm}
+
+```{r,echo = FALSE,include=FALSE}
+library(fpp2)
+library(hts)
+library(tidyverse)
+library(nnfor)
+library("parallel")
+library(kableExtra)
+library(ggplot2)
+library(tseries); library(gridExtra); library(tidyverse); library(TSPred); library(forecast)
+```
+
+## 1. Plot the data to look at some effect of the changing seasonality over time. If necessary, do an STL decomposition of the data
+
+First, we import and clean the NN3 data (including removing NA values) and we create time series for each of the 11 reduced datasets, split in training and test datasets. The data can be seen in the plots below, which shows the test data in red:
+```{r, echo = FALSE, fig.margin = TRUE,fig.align="left", warning=FALSE, message=FALSE}
+
+nn3data = readxl::read_excel("NN3_FINAL_DATASET_WITH_TEST_DATA.xls", skip=12)
+nn3data = nn3data[-c(1,2,3,4,5),]
+nn3data = nn3data[,102:112]
+nn3data = as.data.frame((sapply(nn3data, as.numeric)))
+
+#create list with all the time series
+nn3_lst <- lapply(nn3data, ts, frequency=12)
+
+#remove NANs 
+for(i in 1:length(nn3_lst)) {
+  nn3_lst[[i]] = na.remove(nn3_lst[[i]])
+}
+
+#split into training and testing datasets
+train = list()
+test = list()
+for(name in names(nn3_lst)) {
+  train[[name]] <- subset(nn3_lst[[name]], end=length(nn3_lst[[name]])-18)
+  test[[name]] <- subset(nn3_lst[[name]], start=length(nn3_lst[[name]])-17)
+}
+
+#change the datasets which have more test entries (NN3_108)
+train[["NN3_108"]] <- subset(nn3_lst[["NN3_108"]], end=length(nn3_lst[["NN3_108"]])-19)
+test[["NN3_108"]] <- subset(nn3_lst[["NN3_108"]], start=length(nn3_lst[["NN3_108"]])-18)
+#View(test[["NN3_108"]])
+
+#plot time series
+plots = list()
+for(name in names(train)) {
+  plots[[name]] =
+    autoplot(train[[name]]) + autolayer(test[[name]]) + ylab("NN3 Data") + ggtitle(name) + theme(legend.position="none")
+}
+do.call(grid.arrange, plots)
+```
+
+To observe the seasonal component on its own, we do an STL decomposition. There seems to be yearly seasonality in all of the time series, with some such as NN3_102 being very evident. In most cases, data either peaks at the start/end of the year or halfway through. 
+
+We do not know what these time series datasets represent, however, so we cannot make any assumptions as to why they change so much in terms of seasonality.
+```{r, echo = FALSE, fig.margin = TRUE,fig.align="left", warning=FALSE, message=FALSE}
+plots = list()
+for(name in names(train)) {
+  plots[[name]] =
+    autoplot(stl(train[[name]], s.window=13)$time.series[,1]) + ylab("Seasonal STL") + ggtitle(name) + theme(legend.position="none")
+}
+do.call(grid.arrange, plots)
+```
+
+
+## 2. Forecast using the following established statistical forecasting methods: Naïve, Single Exponential Smoothing, Seasonal Exponential Smoothing, Dampened Trend Exponential Smoothing and ARIMA
+
+We forecast each time series using Naïve, Single Exponential Smoothing (SES), Seasonal Exponential Smoothing (Holt Winters multiplicative method, since seasonal variations are not constant throughout the series), Dampened Trend Exponential Smoothing (dampened Holt's method, where the $\phi$ values (damping) are estimated by the function itself) and ARIMA (using auto.arima()). All the forecast methods can be seen in the plots below, together with the test data to compare them:
+```{r, echo = FALSE, fig.margin = TRUE,fig.align="left", warning=FALSE, message=FALSE}
+h = rep(18,11)
+h[[8]] = 19
+
+#Forecast using Naive method
+naive_nn3 = list()
+acc_naive_nn3 = data.frame()
+for(name in names(train)) {
+  naive_nn3[[name]] = naive(train[[name]], h=h[[match(name, names(train))]])
+  acc_naive_nn3["Naive RMSE", name] = forecast::accuracy(naive_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_naive_nn3["Naive MAPE", name] = forecast::accuracy(naive_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_naive_nn3["Naive SMAPE", name] = sMAPE(test[[name]], naive_nn3[[name]]$mean)
+}
+
+#Forecast using Single Exponential Smoothing (SES)
+ses_nn3 = list()
+acc_ses_nn3 = data.frame()
+for(name in names(train)) {
+  ses_nn3[[name]] = ses(train[[name]], h=h[[match(name, names(train))]])
+  acc_ses_nn3["SES RMSE", name] = forecast::accuracy(ses_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_ses_nn3["SES MAPE", name] = forecast::accuracy(ses_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_ses_nn3["SES SMAPE", name] = sMAPE(test[[name]], ses_nn3[[name]]$mean)
+}
+
+#Forecast using Seasonal Exponential Smoothing (Holt Winters method (multiplicative since seasonal variations are not constant throughout the series))
+hw_nn3 = list()
+acc_hw_nn3 = data.frame()
+for(name in names(train)) {
+  hw_nn3[[name]] = hw(train[[name]], h=h[[match(name, names(train))]], seasonal="multiplicative")
+  acc_hw_nn3["HW RMSE", name] = forecast::accuracy(hw_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_hw_nn3["HW MAPE", name] = forecast::accuracy(hw_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_hw_nn3["HW SMAPE", name] = sMAPE(test[[name]], hw_nn3[[name]]$mean)
+}
+
+#Forecast using Dampened Trend Exponential Smoothing (dampened Holt's method). Phi values (damping) are estimated by the function itself
+holt_nn3 = list()
+acc_holt_nn3 = data.frame()
+for(name in names(train)) {
+  holt_nn3[[name]] = holt(train[[name]], h=h[[match(name, names(train))]], damped=TRUE)
+  acc_holt_nn3["Holt RMSE", name] = forecast::accuracy(holt_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_holt_nn3["Holt MAPE", name] = forecast::accuracy(holt_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_holt_nn3["Holt SMAPE", name] = sMAPE(test[[name]], holt_nn3[[name]]$mean)
+}
+
+#Forecast using ARIMA
+arima_nn3 = list()
+acc_arima_nn3 = data.frame()
+for(name in names(train)) {
+  arima_nn3[[name]] = forecast(auto.arima(train[[name]]), h=h[[match(name, names(train))]])
+  acc_arima_nn3["ARIMA RMSE", name] = forecast::accuracy(arima_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_arima_nn3["ARIMA MAPE", name] = forecast::accuracy(arima_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_arima_nn3["ARIMA SMAPE", name] = sMAPE(test[[name]], arima_nn3[[name]]$mean)
+}
+
+#plot all forecast methods and test dataset together to compare
+plots = list()
+for(name in names(train)) {
+  plots[[name]] =
+    autoplot(train[[name]]) + autolayer(test[[name]], series="Test") + autolayer(naive_nn3[[name]], PI=FALSE, series="Naive") +
+    autolayer(ses_nn3[[name]], PI=FALSE, series="SES") + autolayer(hw_nn3[[name]], PI=FALSE, series="HW") + 
+    autolayer(holt_nn3[[name]], PI=FALSE, series="Holt") + autolayer(arima_nn3[[name]], PI=FALSE, series="ARIMA") +
+    ylab("NN3 Data") + ggtitle(name)
+}
+do.call(grid.arrange, plots)
+```
+
+The forecast accuracy of the different methods in comparison with the test data in terms of the RMSE, SMAPE and MAPE can be seen in the table below:
+```{r, echo = FALSE, fig.margin = TRUE,fig.align="left", warning=FALSE, message=FALSE}
+#Get forecast accuracy for all methods
+acc_naive_nn3 = round(acc_naive_nn3, digits=4)
+acc_ses_nn3 = round(acc_ses_nn3, digits=4)
+acc_hw_nn3 = round(acc_hw_nn3, digits=4)
+acc_holt_nn3 = round(acc_holt_nn3, digits=4)
+acc_arima_nn3 = round(acc_arima_nn3, digits=4)
+acc_nn3 = rbind(acc_naive_nn3, acc_ses_nn3, acc_hw_nn3, acc_holt_nn3, acc_arima_nn3)
+
+kbl(acc_nn3, booktabs=T, linesep = "") %>%
+kable_styling(latex_options = c("scale_down", font_size = 7))
+```
+
+
+## 3. Forecast using the following machine learning algorithms: NNETAR, MLP and ELM
+
+We forecast each time series using NNETAR, MLP (Multi Layer Perceptron) and ELM (Extreme Learning Machines). All the forecast methods can be seen in the plots below, together with the test data to compare them:
+```{r, echo = FALSE, fig.margin = TRUE,fig.align="left", warning=FALSE, message=FALSE}
+h = rep(18,11)
+h[[8]] = 19
+
+#Forecast using nnetar
+nnetar_nn3 = list()
+acc_nnetar_nn3 = data.frame()
+for(name in names(train)) {
+  nnetar_nn3[[name]] = forecast(nnetar(train[[name]],lambda=0),h=h[[match(name, names(train))]])
+  acc_nnetar_nn3["NNetar RMSE", name] = forecast::accuracy(nnetar_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_nnetar_nn3["NNetar MAPE", name] = forecast::accuracy(nnetar_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_nnetar_nn3["NNetar SMAPE", name] = sMAPE(test[[name]], nnetar_nn3[[name]]$mean)
+}
+
+#Forecast using MLP (Multi Layer Perceptron)
+mlp_nn3 = list()
+acc_mlp_nn3 = data.frame()
+for(name in names(train)) {
+  mlp_nn3[[name]] = forecast(mlp(train[[name]]), h=h[[match(name, names(train))]])
+  acc_mlp_nn3["MLP RMSE", name] = forecast::accuracy(mlp_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_mlp_nn3["MLP MAPE", name] = forecast::accuracy(mlp_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_mlp_nn3["MLP SMAPE", name] = sMAPE(test[[name]], mlp_nn3[[name]]$mean)
+}
+
+#Forecast using ELM (Extreme Learning Machines)
+elm_nn3 = list()
+acc_elm_nn3 = data.frame()
+for(name in names(train)) {
+  elm_nn3[[name]] = forecast(elm(train[[name]]), h=h[[match(name, names(train))]])
+  acc_elm_nn3["ELM RMSE", name] = forecast::accuracy(elm_nn3[[name]], test[[name]])["Test set", "RMSE"]
+  acc_elm_nn3["ELM MAPE", name] = forecast::accuracy(elm_nn3[[name]], test[[name]])["Test set", "MAPE"]
+  acc_elm_nn3["ELM SMAPE", name] = sMAPE(test[[name]], elm_nn3[[name]]$mean)
+}
+
+#plot all forecast methods and test dataset together to compare
+plots = list()
+for(name in names(train)) {
+  plots[[name]] =
+    autoplot(train[[name]]) + autolayer(test[[name]], series="Test") + autolayer(nnetar_nn3[[name]], PI=FALSE, series="NNetar") +
+    autolayer(mlp_nn3[[name]], PI=FALSE, series="MLP") + autolayer(elm_nn3[[name]], PI=FALSE, series="ELM") + 
+    ylab("NN3 Data") + ggtitle(name)
+}
+do.call(grid.arrange, plots)
+```
+
+The forecast accuracy of the different methods in comparison with the test data in terms of the RMSE, SMAPE and MAPE can be seen in the table below:
+```{r, echo = FALSE, fig.margin = TRUE,fig.align="left", warning=FALSE, message=FALSE}
+#Get forecast accuracy for all methods
+acc_nnetar_nn3 = round(acc_nnetar_nn3, digits=4)
+acc_mlp_nn3 = round(acc_mlp_nn3, digits=4)
+acc_elm_nn3 = round(acc_elm_nn3, digits=4)
+acc2_nn3 = rbind(acc_nnetar_nn3, acc_mlp_nn3, acc_elm_nn3)
+
+kbl(acc2_nn3, booktabs=T, linesep = "") %>%
+kable_styling(latex_options = c("scale_down", font_size = 7))
+```
+
+
+## 4. Compare the results obtained in sections 2. and 3. and evaluate how the different methods perform across the various time series
+
+With regards to section 2, there is not a single method that outperforms the rest for all the time series. This was expected, as every time series presents different patterns in terms of seasonality, trend and range of values which might be more suitable for one method than another. The Naïve method is the best performing method in terms of accuracy (lowest RMSE, SMAPE and MAPE values on the test set) for series NN3_106; the Holt Winters method for series NN3_101, NN3_105, NN3_107, NN3_109 and NN3_111; the Holt method with damped trend for series NN3_110; and the ARIMA method (which includes seasonal terms for some of the time series) for series NN3_102, NN3_103, NN3_104 and NN3_108. The SES method, however, did not outperform other methods for any of the series. The fact that methods which deal with seasonality generally performed better than other simpler methods is expected, since all our time series present very evident yearly seasonality. 
