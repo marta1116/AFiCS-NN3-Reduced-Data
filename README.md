@@ -4,14 +4,14 @@
 The NN3 dataset is taken from here: http://www.neural-forecasting-competition.com/NN3/
 
 The goal of this task is to forecast the 11 reduced time series NN3_101 to NN3_111 using different methods on R. The methods chosen are the following:
-⋅⋅* Naïve
-⋅⋅* Single Exponential Smoothing (SES)
-⋅⋅* Seasonal Exponential Smoothing (Holt Winters method)
-⋅⋅* Dampened Trend Exponential Smoothing (dampened Holt's method)
-⋅⋅* ARIMA
-⋅⋅* NNETAR
-⋅⋅* MLP (Multi Layer Perceptron)
-⋅⋅* ELM (Extreme Learning Machines)
+* Naïve
+* Single Exponential Smoothing (SES)
+* Seasonal Exponential Smoothing (Holt Winters method)
+* Dampened Trend Exponential Smoothing (dampened Holt's method)
+* ARIMA
+* NNETAR
+* MLP (Multi Layer Perceptron)
+* ELM (Extreme Learning Machines)
 
 The test data is also available on the Excel spreadsheet. Therefore, the methods will be evaluated in terms of forecast accuracy against the actual values from the test dataset. The accuracy measures employed to assess the accuracy of the different methods are RMSE, MAPE and SMAPE. 
 
