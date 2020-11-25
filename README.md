@@ -3,6 +3,9 @@
 
 The NN3 dataset is taken from here: http://www.neural-forecasting-competition.com/NN3/
 
+The NN3 reduced time series are the following, where the test data is shown in red:
+
+
 The goal of this task is to forecast the 11 reduced time series NN3_101 to NN3_111 using different methods on R. The methods chosen are the following:
 * Naïve
 * Single Exponential Smoothing (SES)
@@ -17,6 +20,11 @@ The test data is also available on the Excel spreadsheet. Therefore, the methods
 
 The task is divided into 4 parts:
 1. Plot the data to look at some effect of the changing seasonality over time. If necessary, do an STL decomposition of the data.
+
+
 2. Forecast using the following established statistical forecasting methods: Naïve, Single Exponential Smoothing, Seasonal Exponential Smoothing, Dampened Trend Exponential Smoothing and ARIMA.
+
+
 3. Forecast using the following machine learning algorithms: NNETAR, MLP and ELM.
 4. Compare the results obtained in sections 2. and 3. and evaluate how the different methods perform across the various time series. 
+
