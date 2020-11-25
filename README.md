@@ -35,5 +35,5 @@ The task is divided into 4 parts:
 
 The forecast accuracy results from section 2 are shown below:
 
-<img src="https://github.com/martaaliu/AFiCS-NN3-Reduced-Data/blob/main/Images/Accuracy%20Results%20NN3%20a.PNG?raw=true" width="1080">
+<img src="https://github.com/martaaliu/AFiCS-NN3-Reduced-Data/blob/main/Images/Accuracy%20Results%20NN3%20a.PNG?raw=true" width="900">
 
