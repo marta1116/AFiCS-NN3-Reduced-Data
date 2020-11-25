@@ -33,7 +33,7 @@ The task is divided into 4 parts:
 
 #### 4. Compare the results obtained in sections 2. and 3. and evaluate how the different methods perform across the various time series. 
 
-Results from section 2:
+The forecast accuracy results from section 2 are shown below:
 
-<img src="https://github.com/martaaliu/AFiCS-NN3-Reduced-Data/blob/main/Images/Accuracy%20Results%20NN3%20a.PNG?raw=true" width="720">
+<img src="https://github.com/martaaliu/AFiCS-NN3-Reduced-Data/blob/main/Images/Accuracy%20Results%20NN3%20a.PNG?raw=true" width="1080">
 
