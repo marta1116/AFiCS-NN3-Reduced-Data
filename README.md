@@ -31,9 +31,15 @@ The task is divided into 4 parts:
 
 #### 3. Forecast using the following machine learning algorithms: NNETAR, MLP and ELM.
 
+![NN3 Image 4]()
+
 #### 4. Compare the results obtained in sections 2. and 3. and evaluate how the different methods perform across the various time series. 
 
 The forecast accuracy results from section 2 are shown below:
+
+<img src="https://github.com/martaaliu/AFiCS-NN3-Reduced-Data/blob/main/Images/Accuracy%20Results%20NN3%20a.PNG?raw=true" width="900">
+
+The forecast accuracy results from section 3 are shown below:
 
 <img src="https://github.com/martaaliu/AFiCS-NN3-Reduced-Data/blob/main/Images/Accuracy%20Results%20NN3%20a.PNG?raw=true" width="900">
 
